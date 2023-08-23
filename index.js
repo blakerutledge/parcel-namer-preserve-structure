@@ -1,238 +1,134 @@
-const { Namer } = require("@parcel/plugin");
-const { default: ThrowableDiagnostic, md } = require("@parcel/diagnostic");
-const assert = require("assert");
-const path = require("path");
-const nullthrows = require("nullthrows");
+const { Namer } = require( '@parcel/plugin' )
+const { default: ThrowableDiagnostic, md } = require( '@parcel/diagnostic' )
+const assert = require( 'assert' )
+const path = require( 'path' )
+const nullthrows = require( 'nullthrows' )
 
-const COMMON_NAMES = new Set(["index", "src", "lib"]);
+const COMMON_NAMES = new Set( [ 'index', 'src', 'lib' ] )
 const ALLOWED_EXTENSIONS = {
-  js: ["js", "mjs", "cjs"],
-};
-
-/*
-
-import { Namer } from "@parcel/plugin"
-import defaultName from "@parcel/namer-default"
-
-const CONFIG = Symbol.for("parcel-plugin-config")
-
-var MODE
-
-;(function(MODE) {
-  MODE["ALL"] = "all"
-  MODE["DEVELOPMENT"] = "development"
-  MODE["PRODUCTION"] = "production"
-})(MODE || (MODE = {}))
-
-function matchFileName(configs, newName) {
-  return (
-    Array.isArray(configs) &&
-    configs?.some(v => {
-      const reg = new RegExp(v)
-      return reg.test(newName)
-    })
-  )
+    js: [ 'js', 'mjs', 'cjs' ],
 }
 
-function buildNameWithoutHash({ bundle, oldName, logger, include, exclude }) {
-  try {
-    // if filename has hash,
-    if (!bundle?.needsStableName) {
-      const nameArr = oldName.split(".")
-      nameArr.splice(nameArr.length - 2, 1)
-      const newName = nameArr.join(".")
+module.exports = new Namer( {
+    name( { bundle, bundleGraph } ) {
+        let bundleGroup = bundleGraph.getBundleGroupsContainingBundle( bundle )[ 0 ]
+        let bundleGroupBundles = bundleGraph.getBundlesInBundleGroup( bundleGroup, {
+            includeInline: true,
+        } )
+        let isEntry = bundleGraph.isEntryBundleGroup( bundleGroup )
 
-      if (matchFileName(exclude, newName)) {
-        return oldName
-      }
+        if ( bundle.needsStableName ) {
+            let entryBundlesOfType = bundleGroupBundles.filter(
+                ( b ) => b.needsStableName && b.type === bundle.type,
+            )
+            assert(
+                entryBundlesOfType.length === 1,
+                // Otherwise, we'd end up naming two bundles the same thing.
+                'Bundle group cannot have more than one entry bundle of the same type',
+            )
+        }
 
-      if (matchFileName(include, newName)) {
-        logger.log({
-          message: `${oldName} -> ${newName}`
-        })
-        return newName
-      }
+        let mainBundle = nullthrows(
+            bundleGroupBundles.find( ( b ) =>
+                b.getEntryAssets().some( ( a ) => a.id === bundleGroup.entryAssetId ),
+            ),
+        )
 
-      if (Array.isArray(include)) {
-        return oldName
-      }
-
-      logger.log({
-        message: `${oldName} -> ${newName}`
-      })
-
-      return newName
-    }
-  } catch (err) {
-    console.error(err)
-  }
-
-  return oldName
-}
-
-export default new Namer({
-  async loadConfig({ config }) {
-    const packageJson = await config.getPackage()
-
-    const namerConfig = packageJson?.["parcel-namer-hashless"]
-
-    // if parcel-namer-hashless config is matched
-    if (Object.prototype.toString.call(namerConfig) === "[object Object]") {
-      return Promise.resolve(namerConfig)
-    }
-
-    return Promise.resolve({})
-  },
-  async name({ bundle, bundleGraph, logger, options, config }) {
-    const oldName = await defaultName[CONFIG].name({
-      bundle,
-      bundleGraph,
-      logger
-    })
-
-    const { mode: configMode, include, exclude } = config
-
-    const { mode } = options
-
-    if (configMode === mode || configMode === MODE.ALL) {
-      return buildNameWithoutHash({ bundle, oldName, logger, include, exclude })
-    }
-
-    if (!configMode) {
-      if (mode === MODE.DEVELOPMENT) {
-        return oldName
-      }
-
-      return buildNameWithoutHash({ bundle, oldName, logger, include, exclude })
-    }
-
-    // use default filename
-    return oldName
-  }
-})
-
-*/
-
-module.exports = new Namer({
-  name({ bundle, bundleGraph }) {
-    let bundleGroup = bundleGraph.getBundleGroupsContainingBundle(bundle)[0];
-    let bundleGroupBundles = bundleGraph.getBundlesInBundleGroup(bundleGroup, {
-      includeInline: true,
-    });
-    let isEntry = bundleGraph.isEntryBundleGroup(bundleGroup);
-
-    if (bundle.needsStableName) {
-      let entryBundlesOfType = bundleGroupBundles.filter(
-        (b) => b.needsStableName && b.type === bundle.type
-      );
-      assert(
-        entryBundlesOfType.length === 1,
-        // Otherwise, we'd end up naming two bundles the same thing.
-        "Bundle group cannot have more than one entry bundle of the same type"
-      );
-    }
-
-    let mainBundle = nullthrows(
-      bundleGroupBundles.find((b) =>
-        b.getEntryAssets().some((a) => a.id === bundleGroup.entryAssetId)
-      )
-    );
-
-    if (
-      bundle.id === mainBundle.id &&
+        if (
+            bundle.id === mainBundle.id &&
       isEntry &&
       bundle.target &&
       bundle.target.distEntry != null
-    ) {
-      let loc = bundle.target.loc;
-      let distEntry = bundle.target.distEntry;
-      let distExtension = path.extname(bundle.target.distEntry).slice(1);
-      let allowedExtensions = ALLOWED_EXTENSIONS[bundle.type] || [bundle.type];
-      if (!allowedExtensions.includes(distExtension) && loc) {
-        let fullName = path.relative(
-          path.dirname(loc.filePath),
-          path.join(bundle.target.distDir, distEntry)
-        );
-        let err = new ThrowableDiagnostic({
-          diagnostic: {
-            message: md`Target "${bundle.target.name}" declares an output file path of "${fullName}" which does not match the compiled bundle type "${bundle.type}".`,
-            codeFrames: [
-              {
-                filePath: loc.filePath,
-                codeHighlights: [
-                  {
-                    start: loc.start,
-                    end: loc.end,
-                    message: md`Did you mean "${
-                      fullName.slice(0, -path.extname(fullName).length) +
-                      "." +
+        ) {
+            let loc = bundle.target.loc
+            let distEntry = bundle.target.distEntry
+            let distExtension = path.extname( bundle.target.distEntry ).slice( 1 )
+            let allowedExtensions = ALLOWED_EXTENSIONS[ bundle.type ] || [ bundle.type ]
+            if ( !allowedExtensions.includes( distExtension ) && loc ) {
+                let fullName = path.relative(
+                    path.dirname( loc.filePath ),
+                    path.join( bundle.target.distDir, distEntry ),
+                )
+                let err = new ThrowableDiagnostic( {
+                    diagnostic: {
+                        message: md`Target "${bundle.target.name}" declares an output file path of "${fullName}" which does not match the compiled bundle type "${bundle.type}".`,
+                        codeFrames: [
+                            {
+                                filePath: loc.filePath,
+                                codeHighlights: [
+                                    {
+                                        start: loc.start,
+                                        end: loc.end,
+                                        message: md`Did you mean "${
+                                            fullName.slice( 0, -path.extname( fullName ).length ) +
+                      '.' +
                       bundle.type
-                    }"?`,
-                  },
-                ],
-              },
-            ],
-            hints: [
-              `Try changing the file extension of "${
-                bundle.target.name
-              }" in ${path.relative(process.cwd(), loc.filePath)}.`,
-            ],
-          },
-        });
-        throw err;
-      }
+                                        }"?`,
+                                    },
+                                ],
+                            },
+                        ],
+                        hints: [
+                            `Try changing the file extension of "${
+                                bundle.target.name
+                            }" in ${path.relative( process.cwd(), loc.filePath )}.`,
+                        ],
+                    },
+                } )
+                throw err
+            }
 
-      return bundle.target.distEntry;
+            return bundle.target.distEntry
+        }
+
+        // Base split bundle names on the first bundle in their group.
+        // e.g. if `index.js` imports `foo.css`, the css bundle should be called
+        //      `index.css`.
+        let name = nameFromContent(
+            mainBundle,
+            isEntry,
+            bundleGroup.entryAssetId,
+            bundleGraph.getEntryRoot( bundle.target ),
+        )
+        if ( !bundle.needsStableName ) {
+            name += '.' + bundle.hashReference
+        }
+
+        return name + '.' + bundle.type
+    },
+} )
+
+function nameFromContent( bundle, isEntry, entryAssetId, entryRoot ) {
+    let entryFilePath = nullthrows(
+        bundle.getEntryAssets().find( ( a ) => a.id === entryAssetId ),
+    ).filePath
+    let name = basenameWithoutExtension( entryFilePath )
+
+    // If this is an entry bundle, use the original relative path.
+    // if (bundle.needsStableName) {
+    // Match name of target entry if possible, but with a different extension.
+    if ( isEntry && bundle.target.distEntry != null ) {
+        return basenameWithoutExtension( bundle.target.distEntry )
     }
 
-    // Base split bundle names on the first bundle in their group.
-    // e.g. if `index.js` imports `foo.css`, the css bundle should be called
-    //      `index.css`.
-    let name = nameFromContent(
-      mainBundle,
-      isEntry,
-      bundleGroup.entryAssetId,
-      bundleGraph.getEntryRoot(bundle.target)
-    );
-    if (!bundle.needsStableName) {
-      name += "." + bundle.hashReference;
-    }
+    return path
+        .join( path.relative( entryRoot, path.dirname( entryFilePath ) ), name )
+        .replace( /\.\.(\/|\\)/g, 'up_$1' )
+    // } else {
+    //   // If this is an index file or common directory name, use the parent
+    //   // directory name instead, which is probably more descriptive.
+    //   while (COMMON_NAMES.has(name)) {
+    //     entryFilePath = path.dirname(entryFilePath);
+    //     name = path.basename(entryFilePath);
+    //     if (name.startsWith('.')) {
+    //       name = name.replace('.', '');
+    //     }
+    //   }
 
-    return name + "." + bundle.type;
-  },
-});
-
-function nameFromContent(bundle, isEntry, entryAssetId, entryRoot) {
-  let entryFilePath = nullthrows(
-    bundle.getEntryAssets().find((a) => a.id === entryAssetId)
-  ).filePath;
-  let name = basenameWithoutExtension(entryFilePath);
-
-  // If this is an entry bundle, use the original relative path.
-  // if (bundle.needsStableName) {
-  // Match name of target entry if possible, but with a different extension.
-  if (isEntry && bundle.target.distEntry != null) {
-    return basenameWithoutExtension(bundle.target.distEntry);
-  }
-
-  return path
-    .join(path.relative(entryRoot, path.dirname(entryFilePath)), name)
-    .replace(/\.\.(\/|\\)/g, "up_$1");
-  // } else {
-  //   // If this is an index file or common directory name, use the parent
-  //   // directory name instead, which is probably more descriptive.
-  //   while (COMMON_NAMES.has(name)) {
-  //     entryFilePath = path.dirname(entryFilePath);
-  //     name = path.basename(entryFilePath);
-  //     if (name.startsWith('.')) {
-  //       name = name.replace('.', '');
-  //     }
-  //   }
-
-  //   return name;
-  // }
+    //   return name;
+    // }
 }
 
-function basenameWithoutExtension(file) {
-  return path.basename(file, path.extname(file));
+function basenameWithoutExtension( file ) {
+    return path.basename( file, path.extname( file ) )
 }
