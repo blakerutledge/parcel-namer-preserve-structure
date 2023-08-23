@@ -21,12 +21,15 @@ const MODE = {
 }
 
 function matchFileName( configs, newName ) {
+    
     return (
         Array.isArray( configs ) &&
-    configs?.some( v => {
-        const reg = new RegExp( v )
-        return reg.test( newName )
-    } )
+        configs?.some( v => {
+            const reg = new RegExp( v )
+            let pathname = String( path.resolve( path.normalize( newName ) ) ).split( '\\' ).join( '/' )
+            console.log( pathname, v )
+            return reg.test( pathname )
+        } )
     )
 }
 
