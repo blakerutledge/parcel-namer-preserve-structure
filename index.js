@@ -45,9 +45,9 @@ function buildNameWithoutHash( { bundle, oldName, logger, include, exclude } ) {
             }
 
             if ( matchFileName( include, newName ) ) {
-                logger.log( {
-                    message: `${oldName} -> ${newName}`,
-                } )
+                // logger.log( {
+                //     message: `${oldName} -> ${newName}`,
+                // } )
                 return newName
             }
 
@@ -55,9 +55,9 @@ function buildNameWithoutHash( { bundle, oldName, logger, include, exclude } ) {
                 return oldName
             }
 
-            logger.log( {
-                message: `${oldName} -> ${newName}`,
-            } )
+            // logger.log( {
+            //     message: `${oldName} -> ${newName}`,
+            // } )
 
             return newName
         }
