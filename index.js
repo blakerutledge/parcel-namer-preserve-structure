@@ -27,7 +27,6 @@ function matchFileName( configs, newName ) {
         configs?.some( v => {
             const reg = new RegExp( v )
             let pathname = String( path.resolve( path.normalize( newName ) ) ).split( '\\' ).join( '/' )
-            console.log( pathname, v )
             return reg.test( pathname )
         } )
     )
