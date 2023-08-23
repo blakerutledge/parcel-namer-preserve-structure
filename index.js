@@ -1,16 +1,86 @@
+/* eslint-disable @typescript-eslint/no-var-requires */
 const { Namer } = require( '@parcel/plugin' )
 const { default: ThrowableDiagnostic, md } = require( '@parcel/diagnostic' )
 const assert = require( 'assert' )
 const path = require( 'path' )
 const nullthrows = require( 'nullthrows' )
 
+const defaultName = require( '@parcel/namer-default' )
+
 const COMMON_NAMES = new Set( [ 'index', 'src', 'lib' ] )
 const ALLOWED_EXTENSIONS = {
     js: [ 'js', 'mjs', 'cjs' ],
 }
 
+const CONFIG = Symbol.for( 'parcel-plugin-config' )
+
+const MODE = {
+    'ALL': 'all',
+    'DEVELOPMENT': 'development',
+    'PRODUCTION': 'production',
+}
+
+function matchFileName( configs, newName ) {
+    return (
+        Array.isArray( configs ) &&
+    configs?.some( v => {
+        const reg = new RegExp( v )
+        return reg.test( newName )
+    } )
+    )
+}
+
+function buildNameWithoutHash( { bundle, oldName, logger, include, exclude } ) {
+    try {
+    // if filename has hash,
+        if ( !bundle?.needsStableName ) {
+            const nameArr = oldName.split( '.' )
+            nameArr.splice( nameArr.length - 2, 1 )
+            const newName = nameArr.join( '.' )
+
+            if ( matchFileName( exclude, newName ) ) {
+                return oldName
+            }
+
+            if ( matchFileName( include, newName ) ) {
+                logger.log( {
+                    message: `${oldName} -> ${newName}`,
+                } )
+                return newName
+            }
+
+            if ( Array.isArray( include ) ) {
+                return oldName
+            }
+
+            logger.log( {
+                message: `${oldName} -> ${newName}`,
+            } )
+
+            return newName
+        }
+    } catch ( err ) {
+        console.error( err )
+    }
+
+    return oldName
+}
+
 module.exports = new Namer( {
-    name( { bundle, bundleGraph } ) {
+    async loadConfig( { config } ) {
+        const packageJson = await config.getPackage()
+
+        const namerConfig = packageJson?.[ 'parcel-namer-hashless' ]
+
+        // if parcel-namer-hashless config is matched
+        if ( Object.prototype.toString.call( namerConfig ) === '[object Object]' ) {
+            return Promise.resolve( namerConfig )
+        }
+
+        return Promise.resolve( {} )
+    },
+    async name( { bundle, bundleGraph, logger, options, config } ) {
+
         let bundleGroup = bundleGraph.getBundleGroupsContainingBundle( bundle )[ 0 ]
         let bundleGroupBundles = bundleGraph.getBundlesInBundleGroup( bundleGroup, {
             includeInline: true,
@@ -94,7 +164,23 @@ module.exports = new Namer( {
             name += '.' + bundle.hashReference
         }
 
-        return name + '.' + bundle.type
+        let oldName = name + '.' + bundle.type
+
+        const { mode: configMode, include, exclude } = config
+        const { mode } = options
+        
+        if ( configMode !== mode || configMode !== 'all' ) {
+            return buildNameWithoutHash( { bundle, oldName, logger, include, exclude } )
+        }
+        
+        if ( !configMode ) {
+
+            if ( mode === MODE.DEVELOPMENT ) {
+                return oldName
+            }
+            
+            return buildNameWithoutHash( { bundle, oldName, logger, include, exclude } )
+        }
     },
 } )
 
