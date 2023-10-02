@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-var-requires */
 import { Namer } from '@parcel/plugin'
-import * as diagnostic  from '@parcel/diagnostic'
+import * as diagnostic from '@parcel/diagnostic'
+import * as fs from 'fs'
 import assert from 'assert'
 import path from 'path'
 import nullthrows from 'nullthrows'
@@ -70,10 +71,17 @@ function buildNameWithoutHash( { bundle, oldName, logger, include, exclude } ) {
 
 let namer = new Namer( {
     async loadConfig({ config }) {
-        const packageJson = await config.getPackage()
-        console.log( packageJson )
+
+        //
+        // The damn thing wont behave like all other plugins
+        // It always loads the highest level package.json
+        // Just read the one where we are...
+        // 
+        let real_package = path.join(process.cwd(), 'package.json')
+        let packageJson = await fs.promises.readFile(real_package, 'utf-8')// config.getPackage()
+        packageJson = JSON.parse( packageJson )
         const namerConfig = packageJson?.[ 'parcel-namer-hashless' ]
-        console.log( namerConfig )
+        // console.log( namerConfig )
 
         // if parcel-namer-hashless config is matched
         if ( Object.prototype.toString.call( namerConfig ) === '[object Object]' ) {
