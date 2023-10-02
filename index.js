@@ -1,18 +1,18 @@
 /* eslint-disable @typescript-eslint/no-var-requires */
-const { Namer } = require( '@parcel/plugin' )
-const { default: ThrowableDiagnostic, md } = require( '@parcel/diagnostic' )
-const assert = require( 'assert' )
-const path = require( 'path' )
-const nullthrows = require( 'nullthrows' )
+import { Namer } from '@parcel/plugin'
+import * as diagnostic  from '@parcel/diagnostic'
+import assert from 'assert'
+import path from 'path'
+import nullthrows from 'nullthrows'
 
-const defaultName = require( '@parcel/namer-default' )
+// import defaultName from '@parcel/namer-default'
 
-const COMMON_NAMES = new Set( [ 'index', 'src', 'lib' ] )
+// const COMMON_NAMES = new Set( [ 'index', 'src', 'lib' ] )
 const ALLOWED_EXTENSIONS = {
     js: [ 'js', 'mjs', 'cjs' ],
 }
 
-const CONFIG = Symbol.for( 'parcel-plugin-config' )
+// const CONFIG = Symbol.for( 'parcel-plugin-config' )
 
 const MODE = {
     'ALL': 'all',
@@ -68,11 +68,12 @@ function buildNameWithoutHash( { bundle, oldName, logger, include, exclude } ) {
     return oldName
 }
 
-module.exports = new Namer( {
-    async loadConfig( { config } ) {
+let namer = new Namer( {
+    async loadConfig({ config }) {
         const packageJson = await config.getPackage()
-
+        console.log( packageJson )
         const namerConfig = packageJson?.[ 'parcel-namer-hashless' ]
+        console.log( namerConfig )
 
         // if parcel-namer-hashless config is matched
         if ( Object.prototype.toString.call( namerConfig ) === '[object Object]' ) {
@@ -121,9 +122,9 @@ module.exports = new Namer( {
                     path.dirname( loc.filePath ),
                     path.join( bundle.target.distDir, distEntry ),
                 )
-                let err = new ThrowableDiagnostic( {
+                let err = new diagnostic.ThrowableDiagnostic( {
                     diagnostic: {
-                        message: md`Target "${bundle.target.name}" declares an output file path of "${fullName}" which does not match the compiled bundle type "${bundle.type}".`,
+                        message: diagnostic.md`Target "${bundle.target.name}" declares an output file path of "${fullName}" which does not match the compiled bundle type "${bundle.type}".`,
                         codeFrames: [
                             {
                                 filePath: loc.filePath,
@@ -220,3 +221,5 @@ function nameFromContent( bundle, isEntry, entryAssetId, entryRoot ) {
 function basenameWithoutExtension( file ) {
     return path.basename( file, path.extname( file ) )
 }
+
+export default namer
